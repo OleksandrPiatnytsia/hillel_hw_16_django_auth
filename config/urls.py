@@ -16,3 +16,10 @@ if settings.DEBUG:
     # Uploaded files (covers) in development. runserver serves static files
     # by itself, but not media. In production nginx / storage does this.
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+if settings.ENABLE_DEBUG_TOOLBAR:
+    # Imported here: without requirements-dev.txt the package doesn't exist.
+    # /__debug__/... — the toolbar loads its panels from these URLs.
+    from debug_toolbar.toolbar import debug_toolbar_urls
+
+    urlpatterns += debug_toolbar_urls()

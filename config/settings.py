@@ -11,6 +11,8 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
 import os
+import sys
+from importlib.util import find_spec
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -74,6 +76,24 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+# Django Debug Toolbar (development only, from requirements-dev.txt).
+# Turned on only when ALL of these are true:
+#   - DEBUG=True: never in production
+#   - the package is installed: requirements.txt alone still works
+#   - not `manage.py test`: the toolbar refuses to run in tests
+ENABLE_DEBUG_TOOLBAR = (
+    DEBUG and find_spec("debug_toolbar") is not None and "test" not in sys.argv
+)
+
+if ENABLE_DEBUG_TOOLBAR:
+    INSTALLED_APPS += ["debug_toolbar"]
+    # As early as possible, so it sees the work of every middleware below it
+    # (sessions, auth, ...). After SecurityMiddleware, which only adds headers.
+    MIDDLEWARE.insert(1, "debug_toolbar.middleware.DebugToolbarMiddleware")
+    # The toolbar is shown only for requests from these addresses
+    # (REMOTE_ADDR), in addition to DEBUG=True
+    INTERNAL_IPS = ["127.0.0.1", "::1"]
 
 ROOT_URLCONF = "config.urls"
 

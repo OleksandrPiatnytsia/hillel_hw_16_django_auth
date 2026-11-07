@@ -1,0 +1,4 @@
+# Development-only tools, on top of the main requirements.
+# Install: pip install -r requirements-dev.txt
+-r requirements.txt
+django-debug-toolbar==8.0.0
