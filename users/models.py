@@ -1,5 +1,6 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.db.models.functions import Lower
 
 
 class User(AbstractUser):
@@ -15,8 +16,14 @@ class User(AbstractUser):
     """
 
     # In AbstractUser email is optional (blank=True) and not unique.
-    # Here it is required and unique, so one email = one account.
-    email = models.EmailField("email address", unique=True)
+    # Here it is required, unique and always stored in lowercase — so
+    # "Ann@Mail.com" and "ann@mail.com" are the same email, and plain
+    # unique=True is enough to allow only one account per email.
+    email = models.EmailField(
+        "email address",
+        unique=True,
+        error_messages={"unique": "A user with this email already exists."},
+    )
 
     # Extra fields that `createsuperuser` asks for (besides USERNAME_FIELD
     # and password). AbstractUser already has ["email"]; kept explicit.
@@ -25,4 +32,25 @@ class User(AbstractUser):
     class Meta(AbstractUser.Meta):
         # AbstractUser.Meta holds verbose_name "user"; inheriting it keeps
         # the admin labels the same as for the built-in model
-        pass
+        constraints = [
+            # Database-level guarantee: even QuerySet.update() or raw SQL,
+            # which skip save(), can't store an email with capital letters
+            models.CheckConstraint(
+                condition=models.Q(email=Lower("email")),
+                name="users_user_email_lowercase",
+            ),
+        ]
+
+    def clean(self):
+        # Called by full_clean() — in ModelForms (sign up, admin) it runs
+        # BEFORE the unique / constraint checks, so they see the lowercase value.
+        # super() trims the username and lowercases only the email domain.
+        super().clean()
+        self.email = self.email.lower()
+
+    def save(self, *args, **kwargs):
+        # save() is not preceded by clean() in every path:
+        # createsuperuser, User.objects.create_user(), shell scripts
+        if self.email:
+            self.email = self.email.lower()
+        super().save(*args, **kwargs)
