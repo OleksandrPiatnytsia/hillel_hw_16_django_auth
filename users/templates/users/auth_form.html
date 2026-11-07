@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% comment %}
+Shared by UserLoginView and SignUpView.
+"title" and "submit_label" come from extra_context in the views.
+{% endcomment %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6 col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <h1 class="h4 mb-4">{{ title }}</h1>
+
+        <form method="post" novalidate>
+          {% csrf_token %}
+          {# Where to go after success: LoginView reads it from POST "next" #}
+          <input type="hidden" name="next" value="{{ next }}">
+
+          {# Login form: "Please enter a correct username and password" #}
+          {% if form.non_field_errors %}
+            <div class="alert alert-danger">
+              {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+            </div>
+          {% endif %}
+
+          {% for field in form %}
+            <div class="mb-3">
+              <label class="form-label" for="{{ field.id_for_label }}">
+                {{ field.label }}{% if field.field.required %} <span class="text-danger">*</span>{% endif %}
+              </label>
+              {{ field }}
+              {% if field.help_text %}
+                {# Password rules come from AUTH_PASSWORD_VALIDATORS as an HTML list #}
+                <div class="form-text">{{ field.help_text }}</div>
+              {% endif %}
+              {% for error in field.errors %}
+                <div class="invalid-feedback d-block">{{ error }}</div>
+              {% endfor %}
+            </div>
+          {% endfor %}
+
+          <button type="submit" class="btn btn-primary w-100">{{ submit_label }}</button>
+        </form>
+
+        <hr>
+        <p class="text-center small mb-0">
+          {% if request.resolver_match.url_name == "login" %}
+            No account yet? <a href="{% url 'users:signup' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Sign up</a>
+          {% else %}
+            Already have an account? <a href="{% url 'users:login' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Log in</a>
+          {% endif %}
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

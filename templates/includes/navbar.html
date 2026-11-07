@@ -29,18 +29,54 @@
              {% if current == 'create' %}aria-current="page"{% endif %}
              href="{% url 'books:create' %}">Add book</a>
         </li>
-        <li class="nav-item">
-          <a class="nav-link" href="{% url 'admin:index' %}">Admin</a>
-        </li>
+        {# "user" comes from the auth context processor (settings.TEMPLATES) #}
+        {% if user.is_staff %}
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'admin:index' %}">Admin</a>
+          </li>
+        {% endif %}
       </ul>
 
       {# Quick search: GET to the catalog with only ?q=... #}
-      <form class="d-flex" role="search" method="get" action="{% url 'books:list' %}">
+      <form class="d-flex me-lg-3 mb-2 mb-lg-0" role="search" method="get" action="{% url 'books:list' %}">
         <input class="form-control me-2" type="search" name="q"
                value="{{ request.GET.q }}" placeholder="Title or author"
                aria-label="Search">
         <button class="btn btn-outline-light" type="submit">Search</button>
       </form>
+
+      <ul class="navbar-nav">
+        {% if user.is_authenticated %}
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" role="button"
+               data-bs-toggle="dropdown" aria-expanded="false">
+              👤 {{ user.username }}
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><span class="dropdown-item-text small text-body-secondary">{{ user.email }}</span></li>
+              <li><hr class="dropdown-divider"></li>
+              <li>
+                {# Logout must be POST (Django 5+): a plain link could be #}
+                {# triggered by another site (CSRF), a form with a token can't #}
+                <form method="post" action="{% url 'users:logout' %}">
+                  {% csrf_token %}
+                  <button type="submit" class="dropdown-item">Log out</button>
+                </form>
+              </li>
+            </ul>
+          </li>
+        {% else %}
+          {# ?next=: after login come back to the page the user was on #}
+          <li class="nav-item">
+            <a class="nav-link {% if current == 'login' %}active{% endif %}"
+               href="{% url 'users:login' %}{% if current != 'login' and current != 'signup' %}?next={{ request.get_full_path|urlencode }}{% endif %}">Log in</a>
+          </li>
+          <li class="nav-item">
+            <a class="btn btn-outline-light ms-lg-2"
+               href="{% url 'users:signup' %}{% if current != 'login' and current != 'signup' %}?next={{ request.get_full_path|urlencode }}{% endif %}">Sign up</a>
+          </li>
+        {% endif %}
+      </ul>
     </div>
   </div>
 </nav>

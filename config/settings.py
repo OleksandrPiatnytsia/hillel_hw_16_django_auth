@@ -57,6 +57,14 @@ INSTALLED_APPS = [
 # get a foreign key to this model's table.
 AUTH_USER_MODEL = "users.User"
 
+# Where login_required / LoginRequiredMixin send anonymous users
+# (URL names are fine here: Django resolves them with reverse())
+LOGIN_URL = "users:login"
+# After login, if there is no ?next=...
+LOGIN_REDIRECT_URL = "books:list"
+# After logout
+LOGOUT_REDIRECT_URL = "books:list"
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",

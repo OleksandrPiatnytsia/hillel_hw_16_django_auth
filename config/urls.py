@@ -5,6 +5,8 @@ from django.urls import include, path
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    # Login / logout / sign up: /accounts/login/, ... (namespace "users")
+    path("accounts/", include("users.urls")),
     # Bookstore catalog lives at the site root; namespace "books" comes
     # from app_name in books/urls.py
     path("", include("books.urls")),
