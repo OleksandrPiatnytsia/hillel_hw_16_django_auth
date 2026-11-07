@@ -1,12 +1,15 @@
 # hillel_hw_16 — Django: книгарня (автентифікація, права доступу, логування)
 
 Навчальний Django-проєкт (Hillel). Продовження ДЗ №14 (сайт книгарні на
-Class-Based Views). У цьому ДЗ (у роботі):
+Class-Based Views). У цьому ДЗ:
 
-- **Custom User Model** і вхід, вихід, реєстрація;
-- **permissions і groups**: хто може додавати, редагувати й видаляти книги;
-- **Django Debug Toolbar** для розробки;
-- **logging** і власний **middleware**.
+- **Custom User Model** (`users.User`) з обов'язковим унікальним email у нижньому регістрі;
+- **вхід, вихід, реєстрація**: `LoginView`, `LogoutView` (тільки POST), `CreateView` з автоматичним входом;
+- **permissions і groups**: групи Customers / Editors / Managers, `PermissionRequiredMixin`,
+  `LoginRequiredMixin`, `perms` у шаблонах, власний permission `manage_stock`;
+- **Django Debug Toolbar** лише для розробки (`DEBUG` + `INTERNAL_IPS`);
+- **logging**: консоль і файл із ротацією; вхід, вихід, невдалі спроби входу, зміни книжок;
+- власний **middleware** `RequestTimingMiddleware`: час кожного запиту в лозі й у заголовках.
 
 Що вже є з ДЗ №14:
 
@@ -22,22 +25,30 @@ Class-Based Views). У цьому ДЗ (у роботі):
 - Bootstrap 5.3 (через CDN, із перевіркою `integrity`)
 - Pillow: перевірка зображень для `ImageField`
 - python-dotenv: налаштування з `.env`
+- django-debug-toolbar 8.0 (тільки для розробки, `requirements-dev.txt`)
 
 ## Сторінки сайту
 
 | URL | Ім'я маршруту | View | Що робить |
 |---|---|---|---|
-| `/` | `books:list` | `BookListView` | каталог: фільтри, сортування, пагінація по 10 книг |
-| `/<pk>/` | `books:detail` | `BookDetailView` | сторінка книги |
-| `/create/` | `books:create` | `BookCreateView` | додавання книги |
-| `/<pk>/update/` | `books:update` | `BookUpdateView` | редагування книги |
-| `/<pk>/delete/` | `books:delete` | `BookDeleteView` | підтвердження й видалення |
-| `/authors/` | `books:author_list` | `AuthorListView` | автори з кількістю книг |
-| `/authors/<pk>/` | `books:author_detail` | `AuthorDetailView` | автор, біографія та його книги |
-| `/admin/` | `admin:index` | | адмінка |
+| URL | Ім'я маршруту | View | Доступ | Що робить |
+|---|---|---|---|---|
+| `/` | `books:list` | `BookListView` | усі | каталог: фільтри, сортування, пагінація по 10 книг |
+| `/<pk>/` | `books:detail` | `BookDetailView` | усі | сторінка книги |
+| `/create/` | `books:create` | `BookCreateView` | `books.add_book` | додавання книги |
+| `/<pk>/update/` | `books:update` | `BookUpdateView` | `books.change_book` | редагування книги |
+| `/<pk>/delete/` | `books:delete` | `BookDeleteView` | `books.delete_book` | підтвердження й видалення |
+| `/authors/` | `books:author_list` | `AuthorListView` | усі | автори з кількістю книг |
+| `/authors/<pk>/` | `books:author_detail` | `AuthorDetailView` | усі | автор, біографія та його книги |
+| `/accounts/login/` | `users:login` | `UserLoginView` | усі | вхід (за username) |
+| `/accounts/logout/` | `users:logout` | `UserLogoutView` | POST | вихід |
+| `/accounts/signup/` | `users:signup` | `SignUpView` | гості | реєстрація |
+| `/accounts/profile/` | `users:profile` | `ProfileView` | залогінені | групи й права поточного користувача |
+| `/admin/` | `admin:index` | | `is_staff` | адмінка |
+| `/__debug__/` | | | `DEBUG` + `INTERNAL_IPS` | службові адреси Debug Toolbar |
 
-Маршрути описані в `books/urls.py` з `app_name = "books"` (namespace) і
-підключені в `config/urls.py` через `include()`. У шаблонах і коді адреси
+Маршрути описані в `books/urls.py` (`app_name = "books"`) і `users/urls.py`
+(`app_name = "users"`) і підключені в `config/urls.py` через `include()`. У шаблонах і коді адреси
 будуються тільки за іменами: `{% url 'books:detail' book.pk %}`,
 `reverse_lazy("books:list")`.
 
@@ -45,8 +56,25 @@ Class-Based Views). У цьому ДЗ (у роботі):
 
 ```
 config/
-├── settings.py              # templates, static, media
-└── urls.py                  # admin + include("books.urls") + media у DEBUG
+├── settings.py              # AUTH_USER_MODEL, LOGIN_*, Debug Toolbar, LOGGING, MIDDLEWARE
+├── urls.py                  # admin + books + accounts/ + media і __debug__ у DEBUG
+├── middleware.py            # RequestTimingMiddleware
+└── logging_filters.py       # HideClientErrorTraceback (403/404 без traceback)
+users/
+├── models.py                # User(AbstractUser): email обов'язковий, унікальний, lowercase
+├── forms.py                 # LoginForm, SignUpForm (+ Bootstrap-класи)
+├── views.py                 # UserLoginView, UserLogoutView, SignUpView, ProfileView
+├── urls.py                  # app_name = "users"
+├── admin.py                 # UserAdmin з email на сторінці «Add user»
+├── signals.py               # логування входу, виходу й невдалих спроб
+├── apps.py                  # підключення сигналів у ready()
+├── migrations/
+│   ├── 0001_initial.py
+│   ├── 0002_lowercase_email.py    # дані → lowercase + CheckConstraint
+│   └── 0003_create_groups.py      # групи Customers / Editors / Managers
+└── templates/users/
+    ├── auth_form.html       # спільний для входу й реєстрації
+    └── profile.html
 books/
 ├── models.py                # Category, Author, Book (+ cover), BookCategory, BookQuerySet
 ├── forms.py                 # BookForm, BookFilterForm, CoverInput
@@ -69,6 +97,7 @@ books/
     └── book_stats.py
 templates/                   # спільні шаблони проєкту
 ├── base.html
+├── 403.html                 # «Access denied»
 └── includes/
     ├── navbar.html
     ├── messages.html
@@ -79,7 +108,182 @@ static/                      # статика проєкту
     ├── no-cover.svg         # заглушка, коли обкладинки немає
     └── favicon.svg
 media/                       # завантажені обкладинки (не в git)
+logs/                        # app.log і його ротації (не в git)
+requirements.txt             # залежності проєкту
+requirements-dev.txt         # + django-debug-toolbar
 ```
+
+## Користувачі та автентифікація
+
+### Custom User Model
+
+`users.User` наслідується від `AbstractUser`: усе вбудоване (username,
+пароль, імена, `is_staff`, групи, права) лишається, змінено тільки email.
+
+```python
+# config/settings.py
+AUTH_USER_MODEL = "users.User"
+```
+
+`AUTH_USER_MODEL` треба задати **до першого** `migrate`: таблиці адмінки, груп
+і прав отримують зовнішній ключ саме на цю модель. Тому проєкт стартував з
+нової бази (дані книжок перенесено через `dumpdata` / `loaddata`).
+
+**Email:**
+- обов'язковий і унікальний (`unique=True`, текст помилки в `error_messages`);
+- завжди в нижньому регістрі: `User.clean()` (форми, адмінка) і `User.save()`
+  (`createsuperuser`, `create_user()`, скрипти) переводять його в lowercase,
+  тому `Ann@Mail.com` і `ann@mail.com` вважаються однією адресою;
+- `CheckConstraint` `users_user_email_lowercase` гарантує це на рівні бази,
+  навіть для `QuerySet.update()` і сирого SQL;
+- міграція `0002_lowercase_email` спершу переводить наявні email у lowercase,
+  а вже потім додає обмеження.
+
+Вхід за **username** (як у вбудованого користувача).
+
+### Вхід, вихід, реєстрація
+
+| Сторінка | Як зроблено |
+|---|---|
+| Вхід | `LoginView` + `AuthenticationForm`; `redirect_authenticated_user = True`; повертає на `?next=...` |
+| Вихід | `LogoutView`, **тільки POST** (Django 5+): у меню це кнопка всередині `<form>` з CSRF-токеном, а не посилання |
+| Реєстрація | `CreateView` + `SignUpForm(UserCreationForm)`; після збереження `login()`, новий користувач потрапляє в групу Customers |
+
+```python
+LOGIN_URL = "users:login"            # куди Login/PermissionRequiredMixin відправляють гостей
+LOGIN_REDIRECT_URL = "books:list"    # після входу, якщо немає ?next=
+LOGOUT_REDIRECT_URL = "books:list"
+```
+
+`SignUpView` теж поважає `?next=`, але перевіряє адресу через
+`url_has_allowed_host_and_scheme`, щоб не було переадресації на чужий сайт
+(open redirect). Перевірку паролів (`AUTH_PASSWORD_VALIDATORS`), хешування і
+перевірку username без урахування регістру робить сама `UserCreationForm`.
+
+## Права доступу та групи
+
+### Групи
+
+Створюються data migration `users/0003_create_groups.py`:
+
+| Група | Права (застосунок `books`) | Що може |
+|---|---|---|
+| **Customers** | `view_book`, `view_author`, `view_category` | лише переглядати; дається кожному новому користувачу |
+| **Editors** | Customers + `add/change_book`, `add/change_author`, права на `bookcategory` | додавати й редагувати книжки й авторів |
+| **Managers** | Editors + `delete_book`, `delete_author`, `add/change/delete_category`, `manage_stock` | усе, зокрема видаляти й змінювати склад |
+
+Суперкористувач має всі права без груп. Додати користувача в групу:
+адмінка → Users → користувач → Groups.
+
+Permissions зазвичай створює сигнал `post_migrate`, тобто **після** всіх
+міграцій. На новій базі їх ще немає в момент `0003`, тому міграція спершу
+викликає `create_permissions()` сама. Якщо в назві права помилка, міграція
+падає з `RuntimeError`. Відкат (`migrate users 0002`) видаляє групи.
+
+### Перевірка прав
+
+- **Views:** `PermissionRequiredMixin` стоїть першим у списку батьківських класів:
+  ```python
+  class BookCreateView(PermissionRequiredMixin, BookFormUserMixin, SuccessMessageMixin, CreateView):
+      permission_required = "books.add_book"
+  ```
+  Гість отримує переадресацію на `LOGIN_URL?next=...`, а залогінений
+  користувач без права отримує 403 (`templates/403.html`). Тому окремий
+  `LoginRequiredMixin` тут не потрібен.
+- **`LoginRequiredMixin`** стоїть на `ProfileView`: сторінка не вимагає
+  конкретного права, достатньо бути залогіненим.
+- **Шаблони:** `{% if perms.books.change_book %}` ховає кнопки Edit / Delete /
+  Add book. Це лише зручність, справжній захист у views.
+
+### Власний permission `manage_stock`
+
+```python
+class Book(models.Model):
+    class Meta:
+        permissions = [("manage_stock", "Can change stock quantity")]
+```
+
+`BookForm.__init__(user=...)` робить поле `stock` неактивним (`disabled`),
+якщо в користувача немає `books.manage_stock`. Для такого поля Django
+**ігнорує** значення з POST і бере початкове, тож змінити склад через
+DevTools не вийде. Редактор створює книжку з `stock = 0`, а склад виставляє менеджер.
+
+### Профіль
+
+`/accounts/profile/` показує групи, статус (superuser / staff), коротке
+«що я можу» (✅/❌) і повний список `user.get_all_permissions()`.
+
+## Django Debug Toolbar
+
+Лише для розробки. Вмикається, коли виконуються всі три умови:
+
+```python
+ENABLE_DEBUG_TOOLBAR = (
+    DEBUG and find_spec("debug_toolbar") is not None and "test" not in sys.argv
+)
+```
+
+- `DEBUG=True`: у продакшні тулбара немає взагалі (ні в `INSTALLED_APPS`, ні в URL);
+- пакет встановлено (`requirements-dev.txt`): з одним `requirements.txt` проєкт працює;
+- не `manage.py test`.
+
+Тулбар бачать лише запити з `INTERNAL_IPS = ["127.0.0.1", "::1"]`, незалежно
+від того, хто залогінений. Так можна дивитися SQL і шаблони очима гостя чи
+звичайного покупця. `DebugToolbarMiddleware` стоїть одразу після `SecurityMiddleware`.
+
+Тулбар зберігає дані в пам'яті (`MemoryStore`), тому його міграція прихована
+і `migrate` її не показує, це нормально.
+
+## Логування
+
+`LOGGING` у `config/settings.py`: вивід у консоль і у файл `logs/app.log`
+(`RotatingFileHandler`: 1 МБ, 5 архівних файлів, `utf-8`). Формат:
+
+```
+2026-11-07 21:02:39,943 INFO users.signals Login: user=ann ip=127.0.0.1
+```
+
+| Логер | Рівень | Що пише |
+|---|---|---|
+| `users` | DEBUG при `DEBUG=True`, інакше INFO | вхід, вихід, невдалий вхід (WARNING), реєстрація |
+| `books` | так само | створення, зміна (`form.changed_data`), видалення книжок, хто це зробив |
+| `config` | INFO | рядок на кожен запит від `RequestTimingMiddleware` |
+| `django` | WARNING | 404, 403 одним рядком; 500 з traceback |
+
+- Події входу й виходу ловлять сигнали `user_logged_in`, `user_logged_out`,
+  `user_login_failed` (`users/signals.py`): вони спрацьовують для будь-якого
+  входу, зокрема в адмінці.
+- У лог **не** пишуться паролі й email (персональні дані).
+- `HideClientErrorTraceback` (`config/logging_filters.py`) прибирає traceback з
+  записів про 4xx: для 403 це звичайна відмова, а не помилка. Фільтр стоїть на
+  обробниках (handlers), бо фільтри логера `django` не діють на записи від
+  дочірнього `django.request`.
+
+```bash
+tail -f logs/app.log
+```
+
+## Middleware: `RequestTimingMiddleware`
+
+`config/middleware.py`, **перший** у `MIDDLEWARE`, тому вимірює роботу всіх
+інших middleware, view і шаблону.
+
+```
+INFO config.middleware GET /?page=2&sort=price 200 23.6ms user=anonymous
+INFO config.middleware GET /create/ 403 3.6ms user=ann
+```
+
+- **Лог:** метод, шлях із query string, статус, час, користувач. Запити довші
+  за `REQUEST_SLOW_MS = 500` пишуться як WARNING. `/media/` і `/__debug__/` не логуються.
+- **Заголовки:** `X-Request-Duration: 23.6ms` і стандартний
+  `Server-Timing: app;dur=23.6` (видно в DevTools → Network → Timing).
+- Час рахується через `time.perf_counter()` (монотонний годинник).
+- `request.user` доступний, хоча middleware стоїть вище за
+  `AuthenticationMiddleware`: та присвоює його тому самому об'єкту `request`
+  ще до того, як відповідь повертається до нас.
+
+Реєстрація й вхід займають ~300 мс, решта сторінок кілька мілісекунд: це
+хешування пароля (PBKDF2), воно навмисно повільне.
 
 ## Class-Based Views
 
@@ -87,17 +291,19 @@ media/                       # завантажені обкладинки (не
 |---|---|---|
 | `BookListView` | `books/book_list.html` | `paginate_by = 10`; фільтри з GET-параметрів через `BookFilterForm`; `prefetch_related("categories")` |
 | `BookDetailView` | `books/book_detail.html` | `prefetch_related("categories")` |
-| `BookCreateView` | `books/book_form.html` | `form_class = BookForm`; після збереження редирект на `get_absolute_url()` |
-| `BookUpdateView` | `books/book_form.html` | той самий шаблон; заголовок і кнопки залежать від `object` |
-| `BookDeleteView` | `books/book_confirm_delete.html` | видалення тільки через POST; редирект на каталог |
+| `BookCreateView` | `books/book_form.html` | `PermissionRequiredMixin` (`add_book`); після збереження редирект на `get_absolute_url()` |
+| `BookUpdateView` | `books/book_form.html` | `PermissionRequiredMixin` (`change_book`); той самий шаблон; заголовок і кнопки залежать від `object` |
+| `BookDeleteView` | `books/book_confirm_delete.html` | `PermissionRequiredMixin` (`delete_book`); видалення тільки через POST; редирект на каталог |
 | `AuthorListView` | `books/author_list.html` | `annotate(Count("books"))`, `paginate_by = 20` |
 | `AuthorDetailView` | `books/author_detail.html` | книги автора через `author.books` |
 
 Сторінки авторів тільки для перегляду: авторів додають і редагують в адмінці.
-Для staff-користувачів на сторінках авторів є посилання в адмінку.
+Посилання в адмінку видно, якщо користувач має `is_staff` **і** право
+`add_author` / `change_author`.
 
 Після створення, редагування й видалення `SuccessMessageMixin` показує
-повідомлення (messages framework → Bootstrap alert).
+повідомлення (messages framework → Bootstrap alert), а `form_valid()`
+пише запис у лог (див. «Логування»).
 
 ## Шаблони
 
@@ -105,7 +311,9 @@ media/                       # завантажені обкладинки (не
   наслідуються від нього через `{% extends "base.html" %}`.
 - `navbar.html`: прилипає до верху під час прокручування (`sticky-top`),
   підсвічує активний пункт меню (`request.resolver_match.url_name`), має
-  швидкий пошук і на вузькому екрані згортається в «бургер».
+  швидкий пошук і на вузькому екрані згортається в «бургер». Праворуч:
+  «Log in» / «Sign up» для гостей або меню користувача (email, «My profile»,
+  «Log out»). «Add book» видно лише з правом `add_book`, «Admin» лише при `is_staff`.
 - `pagination.html`: універсальна пагінація для будь-якого `ListView`.
   Тег `{% querystring page=N %}` зберігає поточні фільтри при переході між
   сторінками; довгий список сторінок скорочується (`get_elided_page_range`).
@@ -201,20 +409,26 @@ Django згенерував би `AlterField` і спробував би пер�
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt   # або requirements.txt без Debug Toolbar
 
 cp .env.example .env
 # згенерувати SECRET_KEY і вставити в .env:
 python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
 
-python manage.py migrate
-python manage.py createsuperuser
+python manage.py migrate            # таблиці + групи Customers / Editors / Managers
+python manage.py createsuperuser    # username, email, пароль
 python manage.py seed_books
 python manage.py runserver
 ```
 
-- Сайт: http://127.0.0.1:8000/
+- Сайт: http://127.0.0.1:8000/ (саме `127.0.0.1`, щоб з'явився Debug Toolbar)
 - Адмінка: http://127.0.0.1:8000/admin/
+- Лог: `logs/app.log`
+
+Щоб перевірити права: зареєструйте кілька користувачів через «Sign up»
+(вони потраплять у Customers), в адмінці переведіть одного в Editors, іншого в
+Managers і порівняйте `/accounts/profile/`, кнопки на сторінці книги та поле
+Stock у формі.
 
 ### Змінні оточення (`.env`)
 
@@ -289,6 +503,13 @@ Python-версію з `str.casefold()`. Реєструє її сигнал `con
 - **Сортування кирилиці в SQLite.** SQLite порівнює рядки за кодами
   символів Unicode, тому українська «І» стоїть перед «А» («Іван Багряний»
   опиняється першим у списку авторів). Стосується сортування авторів і книг за назвою.
+- **IP у логах — це `REMOTE_ADDR`.** За проксі (nginx) там буде адреса
+  проксі; справжню треба брати з `X-Forwarded-For`, налаштувавши довіру до проксі.
+- **Вихід у лозі middleware показується як `user=anonymous`**: `logout()`
+  змінює `request.user` раніше, ніж middleware його читає. Хто вийшов, видно в
+  рядку `Logout: user=...` від сигналу.
+- **Немає скидання пароля й підтвердження email.** Для цього потрібна
+  відправка листів (`PasswordResetView`); заплановано.
 - **Валюта одна.** Ціни показуються з `₴`; підтримку кількох валют
   (UAH, USD) заплановано на наступні домашки.
 
@@ -296,4 +517,5 @@ Python-версію з `str.casefold()`. Реєструє її сигнал `con
 
 - i18n: українська та англійська мови інтерфейсу;
 - валюти: модель `Currency` (UAH, USD);
-- тести для views, форм і фільтрів.
+- скидання пароля й підтвердження email;
+- тести для views, форм, фільтрів і прав доступу.
