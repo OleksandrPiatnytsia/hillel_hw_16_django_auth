@@ -1,7 +1,14 @@
-# hillel_hw_14 — Django: книгарня (Class-Based Views, шаблони, статика)
+# hillel_hw_16 — Django: книгарня (автентифікація, права доступу, логування)
 
-Навчальний Django-проєкт (Hillel). Продовження ДЗ №10 (моделі, адмінка,
-management-команди): тепер у книгарні є власний сайт.
+Навчальний Django-проєкт (Hillel). Продовження ДЗ №14 (сайт книгарні на
+Class-Based Views). У цьому ДЗ (у роботі):
+
+- **Custom User Model** і вхід, вихід, реєстрація;
+- **permissions і groups**: хто може додавати, редагувати й видаляти книги;
+- **Django Debug Toolbar** для розробки;
+- **logging** і власний **middleware**.
+
+Що вже є з ДЗ №14:
 
 - **Class-Based Views**: `ListView`, `DetailView`, `CreateView`, `UpdateView`, `DeleteView`;
 - **Django Templates з Bootstrap 5**: базовий шаблон, navbar, пагінація, фільтри;
