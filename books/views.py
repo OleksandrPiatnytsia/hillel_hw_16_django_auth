@@ -1,3 +1,4 @@
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.db.models import Count, Q
 from django.urls import reverse_lazy
@@ -94,31 +95,55 @@ class BookDetailView(DetailView):
         )
 
 
-class BookCreateView(SuccessMessageMixin, CreateView):
+class BookFormUserMixin:
+    """Passes the current user to BookForm (it decides whether "stock" is editable)."""
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        return kwargs
+
+
+# PermissionRequiredMixin goes FIRST (left of CreateView / UpdateView /
+# DeleteView): its dispatch() must run before the view's own dispatch().
+# What it does when has_perm() is False:
+#   - anonymous user -> redirect to LOGIN_URL with ?next=<this page>
+#   - logged-in user without the permission -> 403 (templates/403.html)
+# So a separate LoginRequiredMixin is not needed here.
+
+
+class BookCreateView(
+    PermissionRequiredMixin, BookFormUserMixin, SuccessMessageMixin, CreateView
+):
     """New book. Template: books/book_form.html (shared with update).
 
     No success_url: after saving, Django redirects to book.get_absolute_url().
     """
 
+    permission_required = "books.add_book"
     model = Book
     form_class = BookForm
     success_message = "Book “%(title)s” was created."
 
 
-class BookUpdateView(SuccessMessageMixin, UpdateView):
+class BookUpdateView(
+    PermissionRequiredMixin, BookFormUserMixin, SuccessMessageMixin, UpdateView
+):
     """Edit a book. Template: books/book_form.html (shared with create)."""
 
+    permission_required = "books.change_book"
     model = Book
     form_class = BookForm
     success_message = "Book “%(title)s” was updated."
 
 
-class BookDeleteView(SuccessMessageMixin, DeleteView):
+class BookDeleteView(PermissionRequiredMixin, SuccessMessageMixin, DeleteView):
     """GET -> confirmation page, POST -> delete.
 
     Template: books/book_confirm_delete.html
     """
 
+    permission_required = "books.delete_book"
     model = Book
     context_object_name = "book"
     success_url = reverse_lazy("books:list")

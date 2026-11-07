@@ -47,8 +47,15 @@
 
   <div class="card-footer d-flex gap-2">
     <a class="btn btn-outline-secondary" href="{% url 'books:list' %}">&larr; Back to catalog</a>
-    <a class="btn btn-primary ms-auto" href="{% url 'books:update' book.pk %}">Edit</a>
-    <a class="btn btn-outline-danger" href="{% url 'books:delete' book.pk %}">Delete</a>
+    {# Hiding a button is only for convenience — the views check permissions themselves #}
+    <div class="ms-auto d-flex gap-2">
+      {% if perms.books.change_book %}
+        <a class="btn btn-primary" href="{% url 'books:update' book.pk %}">Edit</a>
+      {% endif %}
+      {% if perms.books.delete_book %}
+        <a class="btn btn-outline-danger" href="{% url 'books:delete' book.pk %}">Delete</a>
+      {% endif %}
+    </div>
   </div>
 </div>
 {% endblock %}

@@ -63,6 +63,18 @@ class BookForm(forms.ModelForm):
             "description": forms.Textarea(attrs={"class": "form-control", "rows": 5}),
         }
 
+    def __init__(self, *args, user=None, **kwargs):
+        # user comes from BookFormUserMixin.get_form_kwargs() in the views
+        super().__init__(*args, **kwargs)
+        if user is not None and not user.has_perm("books.manage_stock"):
+            stock = self.fields["stock"]
+            # disabled: the browser shows the field greyed out AND Django
+            # ignores whatever is POSTed for it, using the initial value
+            # (current stock, or the model default 0 for a new book) — so
+            # editing the HTML in DevTools doesn't help
+            stock.disabled = True
+            stock.help_text = "Only users with the “manage stock” permission can change it."
+
     def clean_cover(self):
         """Extra checks on top of ImageField (which already verifies via Pillow
         that the file is a real image)."""

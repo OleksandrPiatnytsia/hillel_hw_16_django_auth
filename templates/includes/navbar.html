@@ -24,11 +24,13 @@
              {% if current == 'author_list' %}aria-current="page"{% endif %}
              href="{% url 'books:author_list' %}">Authors</a>
         </li>
-        <li class="nav-item">
-          <a class="nav-link {% if current == 'create' %}active{% endif %}"
-             {% if current == 'create' %}aria-current="page"{% endif %}
-             href="{% url 'books:create' %}">Add book</a>
-        </li>
+        {% if perms.books.add_book %}
+          <li class="nav-item">
+            <a class="nav-link {% if current == 'create' %}active{% endif %}"
+               {% if current == 'create' %}aria-current="page"{% endif %}
+               href="{% url 'books:create' %}">Add book</a>
+          </li>
+        {% endif %}
         {# "user" comes from the auth context processor (settings.TEMPLATES) #}
         {% if user.is_staff %}
           <li class="nav-item">
@@ -54,6 +56,7 @@
             </a>
             <ul class="dropdown-menu dropdown-menu-end">
               <li><span class="dropdown-item-text small text-body-secondary">{{ user.email }}</span></li>
+              <li><a class="dropdown-item" href="{% url 'users:profile' %}">My profile</a></li>
               <li><hr class="dropdown-divider"></li>
               <li>
                 {# Logout must be POST (Django 5+): a plain link could be #}

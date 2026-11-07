@@ -86,6 +86,13 @@ class Book(models.Model):
 
     class Meta:
         ordering = ["title"]
+        # Custom permission on top of the 4 default ones (add / change /
+        # delete / view_book). Codename -> "books.manage_stock" in has_perm()
+        # and perms.books.manage_stock in templates. Editors may edit a book,
+        # but only users with this permission may change its stock.
+        permissions = [
+            ("manage_stock", "Can change stock quantity"),
+        ]
 
     def __str__(self):
         # author is a related object: use select_related("author") in lists,

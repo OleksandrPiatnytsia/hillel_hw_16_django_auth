@@ -1,13 +1,18 @@
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.models import Group
 from django.contrib.auth.views import LoginView, LogoutView
 from django.contrib.messages.views import SuccessMessageMixin
 from django.shortcuts import redirect, resolve_url
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.views.generic import CreateView
+from django.views.generic import CreateView, TemplateView
 
 from .forms import LoginForm, SignUpForm
+
+# Group every new user gets (created by the users.0003_create_groups migration)
+DEFAULT_GROUP_NAME = "Customers"
 
 
 class UserLoginView(SuccessMessageMixin, LoginView):
@@ -53,6 +58,11 @@ class SignUpView(SuccessMessageMixin, CreateView):
     def form_valid(self, form):
         # super() saves the user (self.object) and returns the redirect
         response = super().form_valid(form)
+        # filter().first() instead of get(): if the group is missing (e.g. it
+        # was deleted in the admin), registration still works, just without it
+        group = Group.objects.filter(name=DEFAULT_GROUP_NAME).first()
+        if group:
+            self.object.groups.add(group)
         # Log in right away, so the user doesn't type the password twice
         login(self.request, self.object)
         return response
@@ -74,4 +84,24 @@ class SignUpView(SuccessMessageMixin, CreateView):
         # LoginView puts "next" into context itself; do the same here so
         # the shared template keeps it in a hidden field
         context["next"] = self.request.GET.get("next", "")
+        return context
+
+
+class ProfileView(LoginRequiredMixin, TemplateView):
+    """Current user's page: groups and effective permissions.
+
+    LoginRequiredMixin: an anonymous user is redirected to LOGIN_URL
+    (?next=/accounts/profile/). Unlike the book views, there is no specific
+    permission to check here — any logged-in user may open their profile.
+    """
+
+    template_name = "users/profile.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        context["groups"] = user.groups.order_by("name")
+        # get_all_permissions(): own permissions + permissions of all groups,
+        # as "app_label.codename" strings. A superuser gets every permission.
+        context["permissions"] = sorted(user.get_all_permissions())
         return context
