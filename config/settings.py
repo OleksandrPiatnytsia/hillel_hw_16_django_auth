@@ -48,8 +48,14 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     # Local apps
+    "users",
     "books",
 ]
+
+# Custom user model (users.User instead of auth.User). Must be set before
+# the very first `migrate`: other tables (admin log, groups, permissions)
+# get a foreign key to this model's table.
+AUTH_USER_MODEL = "users.User"
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",

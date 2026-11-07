@@ -225,3 +225,6 @@ media/
 
 # Local DB backups (e.g. before data migrations)
 *.sqlite3
+
+# Local data dump used to move books to the fresh DB (hw_16 stage 1)
+books_data.json
