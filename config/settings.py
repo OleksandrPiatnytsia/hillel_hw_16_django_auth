@@ -68,6 +68,8 @@ LOGIN_REDIRECT_URL = "books:list"
 LOGOUT_REDIRECT_URL = "books:list"
 
 MIDDLEWARE = [
+    # Our middleware, first: its timer covers every middleware below + the view
+    "config.middleware.RequestTimingMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -90,7 +92,10 @@ if ENABLE_DEBUG_TOOLBAR:
     INSTALLED_APPS += ["debug_toolbar"]
     # As early as possible, so it sees the work of every middleware below it
     # (sessions, auth, ...). After SecurityMiddleware, which only adds headers.
-    MIDDLEWARE.insert(1, "debug_toolbar.middleware.DebugToolbarMiddleware")
+    MIDDLEWARE.insert(
+        MIDDLEWARE.index("django.middleware.security.SecurityMiddleware") + 1,
+        "debug_toolbar.middleware.DebugToolbarMiddleware",
+    )
     # The toolbar is shown only for requests from these addresses
     # (REMOTE_ADDR), in addition to DEBUG=True
     INTERNAL_IPS = ["127.0.0.1", "::1"]
@@ -257,5 +262,14 @@ LOGGING = {
             "level": APP_LOG_LEVEL,
             "propagate": False,
         },
+        # config.middleware.RequestTimingMiddleware: one line per request
+        "config": {
+            "handlers": ["console", "file"],
+            "level": "INFO",
+            "propagate": False,
+        },
     },
 }
+
+# RequestTimingMiddleware logs requests slower than this as WARNING
+REQUEST_SLOW_MS = 500
