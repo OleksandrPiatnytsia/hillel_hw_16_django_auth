@@ -1,3 +1,5 @@
+import logging
+
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.db.models import Count, Q
@@ -12,6 +14,8 @@ from django.views.generic import (
 
 from .forms import BookFilterForm, BookForm
 from .models import Author, Book
+
+logger = logging.getLogger(__name__)  # "books.views"
 
 
 class ElidedPaginationMixin:
@@ -125,6 +129,17 @@ class BookCreateView(
     form_class = BookForm
     success_message = "Book “%(title)s” was created."
 
+    def form_valid(self, form):
+        response = super().form_valid(form)  # saves -> self.object has a pk
+        logger.info(
+            "Book created: id=%s title=%r stock=%s by user=%s",
+            self.object.pk,
+            self.object.title,
+            self.object.stock,
+            self.request.user.username,
+        )
+        return response
+
 
 class BookUpdateView(
     PermissionRequiredMixin, BookFormUserMixin, SuccessMessageMixin, UpdateView
@@ -135,6 +150,19 @@ class BookUpdateView(
     model = Book
     form_class = BookForm
     success_message = "Book “%(title)s” was updated."
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        # changed_data: names of fields whose value differs from the initial
+        # one — shows WHAT was edited, not just "something changed"
+        logger.info(
+            "Book updated: id=%s title=%r changed=%s by user=%s",
+            self.object.pk,
+            self.object.title,
+            form.changed_data or "nothing",
+            self.request.user.username,
+        )
+        return response
 
 
 class BookDeleteView(PermissionRequiredMixin, SuccessMessageMixin, DeleteView):
@@ -149,6 +177,18 @@ class BookDeleteView(PermissionRequiredMixin, SuccessMessageMixin, DeleteView):
     success_url = reverse_lazy("books:list")
     # the confirmation page shows the author's name
     queryset = Book.objects.select_related("author")
+
+    def form_valid(self, form):
+        # Remember pk BEFORE deleting: after delete() Django sets it to None
+        book_id = self.object.pk
+        response = super().form_valid(form)
+        logger.info(
+            "Book deleted: id=%s title=%r by user=%s",
+            book_id,
+            self.object.title,
+            self.request.user.username,
+        )
+        return response
 
     def get_success_message(self, cleaned_data):
         # Delete form has no fields, so take the title from the deleted object

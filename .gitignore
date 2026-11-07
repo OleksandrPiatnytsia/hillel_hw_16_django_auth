@@ -228,3 +228,6 @@ media/
 
 # Local data dump used to move books to the fresh DB (hw_16 stage 1)
 books_data.json
+
+# Log files (LOGGING in config/settings.py)
+logs/

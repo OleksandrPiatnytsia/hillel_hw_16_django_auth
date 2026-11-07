@@ -185,3 +185,77 @@ MAILERS = {
         "BACKEND": "django.core.mail.backends.console.EmailBackend",
     },
 }
+
+
+# Logging
+# https://docs.djangoproject.com/en/6.1/topics/logging/
+#
+# Loggers are named after modules: logging.getLogger(__name__) in
+# books/views.py gives "books.views", a child of the "books" logger below,
+# so its records go to the handlers of "books".
+
+LOGS_DIR = BASE_DIR / "logs"
+# RotatingFileHandler doesn't create folders; logs/ is not in git
+LOGS_DIR.mkdir(exist_ok=True)
+
+# Our own code: everything in development, INFO and above otherwise
+APP_LOG_LEVEL = "DEBUG" if DEBUG else "INFO"
+
+LOGGING = {
+    "version": 1,
+    # Keep Django's own loggers (django.server prints runserver requests)
+    "disable_existing_loggers": False,
+    "formatters": {
+        # 2026-11-07 21:15:03,512 INFO users.signals Login: user=ann ip=127.0.0.1
+        "verbose": {
+            "format": "{asctime} {levelname} {name} {message}",
+            "style": "{",
+        },
+    },
+    "filters": {
+        "hide_client_error_traceback": {
+            "()": "config.logging_filters.HideClientErrorTraceback",
+        },
+    },
+    "handlers": {
+        # The filter is on the handlers, not on the "django" logger: logger
+        # filters don't apply to records coming up from child loggers
+        # (django.request -> django). It touches only 4xx records anyway.
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+            "filters": ["hide_client_error_traceback"],
+        },
+        "file": {
+            # When app.log reaches 1 MB it is renamed to app.log.1
+            # (app.log.1 -> app.log.2, ...), only the 5 newest are kept
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": LOGS_DIR / "app.log",
+            "maxBytes": 1024 * 1024,
+            "backupCount": 5,
+            "encoding": "utf-8",  # book titles may be in Ukrainian
+            "formatter": "verbose",
+            "filters": ["hide_client_error_traceback"],
+        },
+    },
+    "loggers": {
+        # Django itself: only problems. django.request logs 404 ("Not Found"),
+        # 403 ("Forbidden") as WARNING and 500 with a traceback as ERROR.
+        # INFO would add noise like "Watching for file changes".
+        "django": {
+            "handlers": ["console", "file"],
+            "level": "WARNING",
+        },
+        "books": {
+            "handlers": ["console", "file"],
+            "level": APP_LOG_LEVEL,
+            # Don't pass records up to the root logger: no duplicates
+            "propagate": False,
+        },
+        "users": {
+            "handlers": ["console", "file"],
+            "level": APP_LOG_LEVEL,
+            "propagate": False,
+        },
+    },
+}

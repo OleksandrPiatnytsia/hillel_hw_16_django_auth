@@ -1,3 +1,5 @@
+import logging
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login
@@ -10,6 +12,8 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.generic import CreateView, TemplateView
 
 from .forms import LoginForm, SignUpForm
+
+logger = logging.getLogger(__name__)  # "users.views"
 
 # Group every new user gets (created by the users.0003_create_groups migration)
 DEFAULT_GROUP_NAME = "Customers"
@@ -63,6 +67,11 @@ class SignUpView(SuccessMessageMixin, CreateView):
         group = Group.objects.filter(name=DEFAULT_GROUP_NAME).first()
         if group:
             self.object.groups.add(group)
+        else:
+            logger.warning("Group %r not found, new user left without it", DEFAULT_GROUP_NAME)
+        # Only username and id: email is personal data, logs are read by more
+        # people (and kept longer) than the database
+        logger.info("Sign up: user=%s id=%s", self.object.username, self.object.pk)
         # Log in right away, so the user doesn't type the password twice
         login(self.request, self.object)
         return response
